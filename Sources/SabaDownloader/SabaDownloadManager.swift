@@ -6,7 +6,12 @@
 //  Copyright © 2016 ideamakerz. All rights reserved.
 //
 
+import Foundation
+
+#if os(iOS)
 import UIKit
+#endif
+
 fileprivate func < <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -76,6 +81,24 @@ open class SabaDownloadManager: NSObject {
     
     open var downloadingArray: [SabaDownloadModel] = []
     
+    
+    
+    /// Initializer for foreground downloader only
+    /// - Parameters:
+    public convenience init(delegate: SabaDownloadManagerDelegate, sessionConfiguration: URLSessionConfiguration, completion: (() -> Void)? = nil) {
+        self.init()
+        self.delegate = delegate
+        self.sessionManager = .init(configuration: sessionConfiguration, delegate: self, delegateQueue: nil)
+        self.populateOtherDownloadTasks()
+        self.backgroundSessionCompletionHandler = completion
+    }
+    
+    /// Default init which covers background mode as well
+    /// - Parameters:
+    ///   - sessionIdentifer: <#sessionIdentifer description#>
+    ///   - delegate: <#delegate description#>
+    ///   - sessionConfiguration: <#sessionConfiguration description#>
+    ///   - completion: <#completion description#>
     public convenience init(session sessionIdentifer: String, delegate: SabaDownloadManagerDelegate, sessionConfiguration: URLSessionConfiguration? = nil, completion: (() -> Void)? = nil) {
         self.init()
         self.delegate = delegate
@@ -430,6 +453,8 @@ extension SabaDownloadManager {
         downloadTask!.cancel()
     }
     
+#if os(iOS)
+    
     @objc public func presentNotificationForDownload(_ notifAction: String, notifBody: String) {
         let application = UIApplication.shared
         let applicationState = application.applicationState
@@ -443,4 +468,5 @@ extension SabaDownloadManager {
             application.presentLocalNotificationNow(localNotification)
         }
     }
+#endif
 }

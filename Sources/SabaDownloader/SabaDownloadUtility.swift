@@ -6,7 +6,7 @@
 //  Copyright (c) 2014 ideamakerz. All rights reserved.
 //
 
-import UIKit
+import Foundation
 
 open class SabaDownloadUtility: NSObject {
     
