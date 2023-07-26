@@ -283,7 +283,9 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 let destinationPath = taskDescComponents[self.TaskDescFileDestinationIndex]
                 
                 let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
-                downloadModel.status = TaskStatus.failed.description()
+                if downloadModel.status != TaskStatus.paused.description() {
+                    downloadModel.status = TaskStatus.failed.description()
+                }
                 downloadModel.task = downloadTask
                 
                 let resumeData = err?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
@@ -299,6 +301,10 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 downloadModel.task = newTask
                 
                 self.downloadingArray.append(downloadModel)
+                
+                guard downloadModel.status != TaskStatus.paused.description() else {
+                    return
+                }
                 
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
                 
@@ -325,10 +331,16 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                             }
                             
                             newTask.taskDescription = task.taskDescription
-                            downloadModel.status = TaskStatus.failed.description()
+                            if downloadModel.status != TaskStatus.paused.description() {
+                                downloadModel.status = TaskStatus.failed.description()
+                            }
                             downloadModel.task = newTask as? URLSessionDownloadTask
                             
                             self.downloadingArray[index] = downloadModel
+                            
+                            guard downloadModel.status != TaskStatus.paused.description() else {
+                                return
+                            }
                             
                             if let error = err {
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
@@ -433,7 +445,8 @@ extension SabaDownloadManager {
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
         let downloadModel = downloadingArray[index]
         
-        guard downloadModel.status != TaskStatus.downloading.description() else {
+        guard downloadModel.status != TaskStatus.downloading.description() ||
+              downloadModel.status != TaskStatus.paused.description() else {
             return
         }
         
