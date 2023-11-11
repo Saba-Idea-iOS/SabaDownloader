@@ -9,7 +9,7 @@
 import Foundation
 
 public enum TaskStatus: Int {
-    case unknown, gettingInfo, downloading, paused, failed
+    case unknown, gettingInfo, downloading, paused, failed, inQueue, finished
     
     public func description() -> String {
         switch self {
@@ -21,6 +21,10 @@ public enum TaskStatus: Int {
             return "Paused"
         case .failed:
             return "Failed"
+        case .inQueue:
+            return "InQueue"
+        case .finished:
+            return "Finished"
         default:
             return "Unknown"
         }
@@ -31,7 +35,7 @@ open class SabaDownloadModel: NSObject {
     
     open var fileName: String!
     open var fileURL: String!
-    open var status: String = TaskStatus.gettingInfo.description()
+    open var status: String = TaskStatus.inQueue.description()
     
     open var file: (size: Float, unit: String)?
     open var downloadedFile: (size: Float, unit: String)?

@@ -22,7 +22,6 @@ fileprivate func < <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
     return false
   }
 }
-
 fileprivate func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -31,8 +30,6 @@ fileprivate func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
     return rhs < lhs
   }
 }
-
-
 @objc public protocol SabaDownloadManagerDelegate: AnyObject {
     /**A delegate method called each time whenever any download task's progress is updated
      */
@@ -68,11 +65,8 @@ fileprivate func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 }
 
 open class SabaDownloadManager: NSObject {
-    
     fileprivate var sessionManager: URLSession!
-    
     fileprivate var backgroundSessionCompletionHandler: (() -> Void)?
-    
     fileprivate let TaskDescFileNameIndex = 0
     fileprivate let TaskDescFileURLIndex = 1
     fileprivate let TaskDescFileDestinationIndex = 2
@@ -80,8 +74,6 @@ open class SabaDownloadManager: NSObject {
     fileprivate weak var delegate: SabaDownloadManagerDelegate?
     
     open var downloadingArray: [SabaDownloadModel] = []
-    
-    
     
     /// Initializer for foreground downloader only
     /// - Parameters:
@@ -139,7 +131,6 @@ extension SabaDownloadManager {
     }
     
     fileprivate func populateOtherDownloadTasks() {
-        
         let downloadTasks = self.downloadTasks()
         
         for downloadTask in downloadTasks {
@@ -165,13 +156,10 @@ extension SabaDownloadManager {
     }
     
     fileprivate func isValidResumeData(_ resumeData: Data?) -> Bool {
-        
         guard resumeData != nil || resumeData?.count > 0 else {
             return false
         }
-        
         return true
-        
     }
 }
 
@@ -371,20 +359,30 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
 
 extension SabaDownloadManager {
     
-    @objc public func addDownloadTask(_ fileName: String, request: URLRequest, destinationPath: String) {
+    @objc public func addDownloadTask(_ fileName: String,
+                                      request: URLRequest,
+                                      destinationPath: String,
+                                      status: String = String()) {
         
         let url = request.url!
         let fileURL = url.absoluteString
         
         let downloadTask = sessionManager.downloadTask(with: request)
         downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
-        downloadTask.resume()
-        
         debugPrint("session manager:\(String(describing: sessionManager)) url:\(String(describing: url)) request:\(String(describing: request))")
         
         let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
+        if downloadingArray.filter({ $0.task?.state == .running }).count > 0 {
+            downloadModel.status = status
+            downloadTask.progress.pause()
+        } else if status == TaskStatus.paused.description() {
+            downloadModel.status = TaskStatus.paused.description()
+            downloadTask.progress.pause()
+        } else {
+            downloadTask.resume()
+            downloadModel.status = TaskStatus.downloading.description()
+        }
         downloadModel.startTime = Date()
-        downloadModel.status = TaskStatus.downloading.description()
         downloadModel.task = downloadTask
         
         downloadingArray.append(downloadModel)
