@@ -361,48 +361,25 @@ extension SabaDownloadManager {
     
     @objc public func addDownloadTask(_ fileName: String,
                                       request: URLRequest,
-                                      destinationPath: String,
-                                      status: String = String()) {
+                                      destinationPath: String) {
         
         let url = request.url!
         let fileURL = url.absoluteString
         
         let downloadTask = sessionManager.downloadTask(with: request)
         downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
+        downloadTask.resume()
+        
         debugPrint("session manager:\(String(describing: sessionManager)) url:\(String(describing: url)) request:\(String(describing: request))")
         
         let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
-        if downloadingArray.filter({ $0.task?.state == .running }).count > 0 {
-            downloadModel.status = status
-            downloadTask.progress.pause()
-        } else if status == TaskStatus.paused.description() {
-            downloadModel.status = TaskStatus.paused.description()
-            downloadTask.progress.pause()
-        } else {
-            downloadTask.resume()
-            downloadModel.status = TaskStatus.downloading.description()
-        }
+        
         downloadModel.startTime = Date()
+        downloadModel.status = TaskStatus.downloading.description()
         downloadModel.task = downloadTask
         
         downloadingArray.append(downloadModel)
         delegate?.downloadRequestStarted?(downloadModel, index: downloadingArray.count - 1)
-    }
-    
-    @objc public func addDownloadTask(_ fileName: String, fileURL: String, destinationPath: String) {
-        
-        let url = URL(string: fileURL)!
-        let request = URLRequest(url: url)
-        addDownloadTask(fileName, request: request, destinationPath: destinationPath)
-        
-    }
-    
-    @objc public func addDownloadTask(_ fileName: String, fileURL: String) {
-        addDownloadTask(fileName, fileURL: fileURL, destinationPath: "")
-    }
-    
-    @objc public func addDownloadTask(_ fileName: String, request: URLRequest) {
-        addDownloadTask(fileName, request: request, destinationPath: "")
     }
     
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
