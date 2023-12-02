@@ -5,6 +5,9 @@ import PackageDescription
 
 let package = Package(
     name: "SabaDownloader",
+    platforms: [
+        .macOS(.v11), .tvOS(.v13), .iOS(.v13)
+    ],
     products: [
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
@@ -12,6 +15,8 @@ let package = Package(
             targets: ["SabaDownloader"]),
     ],
     dependencies: [
+        .package(
+            url: "https://github.com/FabrizioBrancati/Queuer.git", .exact("2.0.0"))
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
     ],
@@ -20,7 +25,9 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "SabaDownloader",
-            dependencies: []),
+            dependencies: [
+                "Queuer"
+            ]),
         .testTarget(
             name: "SabaDownloaderTests",
             dependencies: ["SabaDownloader"]),
