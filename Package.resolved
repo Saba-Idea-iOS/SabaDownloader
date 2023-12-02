@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "Queuer",
+        "repositoryURL": "https://github.com/FabrizioBrancati/Queuer.git",
+        "state": {
+          "branch": null,
+          "revision": "656376be82cb1e10ed69e87bc451d6e1d7ae6619",
+          "version": "2.0.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
