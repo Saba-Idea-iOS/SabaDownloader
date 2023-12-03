@@ -70,11 +70,11 @@ open class SabaDownloadManager: NSObject {
     fileprivate let TaskDescFileNameIndex = 0
     fileprivate let TaskDescFileURLIndex = 1
     fileprivate let TaskDescFileDestinationIndex = 2
-    
+
     fileprivate weak var delegate: SabaDownloadManagerDelegate?
     
     open var downloadingArray: [SabaDownloadModel] = []
-    
+
     /// Initializer for foreground downloader only
     /// - Parameters:
     public convenience init(delegate: SabaDownloadManagerDelegate, sessionConfiguration: URLSessionConfiguration, completion: (() -> Void)? = nil) {
@@ -415,7 +415,25 @@ extension SabaDownloadManager {
         
         delegate?.downloadRequestDidPaused?(downloadModel, index: index)
     }
-    
+
+    @objc public func waitDownloadTaskAtIndex(_ index: Int) {
+
+        let downloadModel = downloadingArray[index]
+
+        guard downloadModel.status != TaskStatus.waiting.description() else {
+            return
+        }
+
+        let downloadTask = downloadModel.task
+        downloadTask!.suspend()
+        downloadModel.status = TaskStatus.waiting.description()
+        downloadModel.startTime = Date()
+
+        downloadingArray[index] = downloadModel
+
+        delegate?.downloadRequestDidPaused?(downloadModel, index: index)
+    }
+
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
         
         let downloadModel = downloadingArray[index]
