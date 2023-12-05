@@ -331,6 +331,10 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                             
                             if err == nil {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
+                                delay(1) { [weak self] in
+                                    print("-------->urldidcomplete2-continue")
+                                    self?.semaphore.continue()
+                                }
                             } else {
                                 print("-------->23")
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
@@ -369,10 +373,6 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                         }
                         break
                     }
-                }
-                delay(1) { [weak self] in
-                    print("-------->urldidcomplete2-continue")
-                    self?.semaphore.continue()
                 }
             }
         }
@@ -565,7 +565,7 @@ extension SabaDownloadManager {
         print("-------->cancel")
         let downloadInfo = downloadingArray[index]
         let downloadTask = downloadInfo.task
-//        downloadTask!.cancel()
+        downloadTask!.cancel()
         for oper in queue.operations {
             if let operation = oper as? SynchronousOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
