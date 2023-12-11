@@ -82,6 +82,7 @@ open class SabaDownloadManager: NSObject {
                            qualityOfService: .utility)
         return queue
     }()
+    var queueChecker = true
     let semaphore = Semaphore()
     /// Initializer for foreground downloader only
     /// - Parameters:
@@ -147,11 +148,11 @@ extension SabaDownloadManager {
 //            let fileName = taskDescComponents[TaskDescFileNameIndex]
 //            let fileURL = taskDescComponents[TaskDescFileURLIndex]
 //            let destinationPath = taskDescComponents[TaskDescFileDestinationIndex]
-//            
+//
 //            let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
 //            downloadModel.task = downloadTask
 //            downloadModel.startTime = Date()
-//            
+//
 //            if downloadTask.state == .running {
 //                downloadModel.status = TaskStatus.downloading.description()
 //                downloadingArray.append(downloadModel)
@@ -319,7 +320,11 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
                 delay(1) { [weak self] in
                     print("-------->urldidcomplete1-continue")
-                    self?.semaphore.continue()
+                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) {
+                        self?.semaphore.continue()
+                    } else {
+                        print("-------->executing0 > 0")
+                    }
                 }
                 
             } else {
@@ -333,11 +338,23 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
                                 delay(1) { [weak self] in
                                     print("-------->urldidcomplete2-continue")
-                                    self?.semaphore.continue()
+                                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) {
+                                        self?.semaphore.continue()
+                                    } else {
+                                        print("-------->executing1 > 0")
+                                    }
                                 }
                             } else {
                                 print("-------->23")
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
+                                delay(1) { [weak self] in
+                                    print("-------->urldidcomplete2-continue")
+                                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) {
+                                        self?.semaphore.continue()
+                                    } else {
+                                        print("-------->executing2 > 0")
+                                    }
+                                }
                             }
                             
                         } else {
@@ -407,13 +424,17 @@ extension SabaDownloadManager {
         self.downloadingArray.append(downloadModel)
         let index = self.downloadingArray.count - 1
         self.delegate?.downloadRequestQueued?(downloadModel, index: index)
+        let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
         delay(1) { [weak self] in
             let operation = SynchronousOperation { operation in
-                let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
-                operation.name = taskName
-                print("-------->addtask--\(taskName)")
                 downloadTask.resume()
-                self?.semaphore.wait()
+                if self?.queueChecker ?? true {
+                    self?.semaphore.wait()
+                }
+            }
+            operation.name = taskName
+            if let priority = Operation.QueuePriority(rawValue: 1) {
+                operation.queuePriority = priority
             }
             self?.queue.addOperation(operation)
             self?.queue.resume()
@@ -462,7 +483,6 @@ extension SabaDownloadManager {
         for oper in queue.operations {
             if let operation = oper as? SynchronousOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
-                oper.cancel()
                 operation.cancel()
                 operation.finish(false)
             }
@@ -476,15 +496,6 @@ extension SabaDownloadManager {
     
     @objc public func pauseWithoutContinueDownloadTasks() {
         print("-------->pause2")
-        for oper in queue.operations {
-            if let operation = oper as? SynchronousOperation {
-                if operation.isExecuting {
-                    operation.finish(false)
-                    operation.cancel()
-                    oper.cancel()
-                }
-            }
-        }
         guard let index = self.downloadingArray.firstIndex(where: { $0.status ==  TaskStatus.downloading.description() }) else {
             return
         }
@@ -506,39 +517,54 @@ extension SabaDownloadManager {
     
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
         print("-------->resume")
-        pauseWithoutContinueDownloadTasks()
-        if let operations = queue.operations as? [SynchronousOperation] {
-            let downloadModel = self.downloadingArray[index]
-            let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
-            let operation = operations.first(where: { $0.name == taskName })
-            
-            if operation != nil {
-                semaphore.continue()
-                return
+        let downloadModel = self.downloadingArray[index]
+        let taskName = String(downloadModel.task?.taskIdentifier ?? -1)
+        if let operations = queue.operations as? [SynchronousOperation],
+           let operation = operations.first(where: { $0.name == taskName }) {
+            pauseWithoutContinueDownloadTasks()
+            queue.pause()
+            print("-------->queue.paused")
+            queueChecker = false
+            operation.execute()
+            self.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+            queueChecker = true
+            queue.resume()
+            print("-------->queue.resumed")
+            return
+        } else {
+            for oper in queue.operations {
+                if let operation = oper as? SynchronousOperation {
+                    if operation.isExecuting {
+                        operation.cancel()
+                        operation.finish(false)
+                    }
+                }
             }
-        }
-        delay(1.0) { [weak self] in
-            let operation = SynchronousOperation { operation in
+            pauseWithoutContinueDownloadTasks()
+            delay(1.0) { [weak self] in
                 guard let downloadModel = self?.downloadingArray[index] else {
                     return
                 }
-                
-                guard downloadModel.status != TaskStatus.downloading.description() else {
-                    return
-                }
-                let downloadTask = downloadModel.task
-                downloadTask!.resume()
-                downloadModel.status = TaskStatus.downloading.description()
-                
-                self?.downloadingArray[index] = downloadModel
-                self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
                 let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
-//                print("-------->resume-wait--\(taskName)")
+                print("-------->add task ddd----> 1 --> \(taskName)")
+                let operation = SynchronousOperation { operation in
+                    guard downloadModel.status != TaskStatus.downloading.description() else {
+                        return
+                    }
+                    let downloadTask = downloadModel.task
+                    downloadTask!.resume()
+                    downloadModel.status = TaskStatus.downloading.description()
+                    
+                    self?.downloadingArray[index] = downloadModel
+                    self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+                    operation.name = taskName
+                    print("-------->add task ddd----> 2 --> \(taskName)")
+                    self?.semaphore.wait()
+                }
                 operation.name = taskName
-                self?.semaphore.wait()
+                self?.queue.addOperation(operation)
+                self?.queue.resume()
             }
-            self?.queue.addOperation(operation)
-            self?.queue.resume()
         }
     }
     
@@ -569,8 +595,7 @@ extension SabaDownloadManager {
         for oper in queue.operations {
             if let operation = oper as? SynchronousOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
-                print("operation.name==========>\(operation.name ?? "no")")
-                oper.cancel()
+                print("operation.name----------->\(operation.name ?? "no")")
                 operation.cancel()
                 operation.finish(false)
             }
