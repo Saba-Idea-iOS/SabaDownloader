@@ -319,8 +319,8 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
                 delay(1) { [weak self] in
-                    print("-------->urldidcomplete1-continue")
-                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) {
+                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) && self?.queue.operationCount > 0 {
+                        print("-------->urldidcomplete1-continue")
                         self?.semaphore.continue()
                     } else {
                         print("-------->executing0 > 0")
@@ -337,8 +337,8 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                             if err == nil {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
                                 delay(1) { [weak self] in
-                                    print("-------->urldidcomplete2-continue")
-                                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) {
+                                    if self?.queue.operationCount > 0 {
+                                        print("-------->urldidcomplete22-continue")
                                         self?.semaphore.continue()
                                     } else {
                                         print("-------->executing1 > 0")
@@ -348,8 +348,8 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                                 print("-------->23")
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
                                 delay(1) { [weak self] in
-                                    print("-------->urldidcomplete2-continue")
-                                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) {
+                                    if self?.queue.operationCount > 0 {
+                                        print("-------->urldidcomplete23-continue")
                                         self?.semaphore.continue()
                                     } else {
                                         print("-------->executing2 > 0")
