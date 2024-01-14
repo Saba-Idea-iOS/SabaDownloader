@@ -86,6 +86,7 @@ open class SabaDownloadManager: NSObject {
         return queue
     }()
     var queueChecker = true
+    var lastDownloadingTaskId: Int?
     let semaphore = Semaphore()
     /// Initializer for foreground downloader only
     /// - Parameters:
@@ -193,7 +194,12 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                     if self.downloadingArray.contains(downloadModel), let objectIndex = self.downloadingArray.firstIndex(of: downloadModel) {
                         self.downloadingArray[objectIndex] = downloadModel
                     }
-                    
+                    if downloadTask.taskIdentifier != self.lastDownloadingTaskId {
+                        self.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+                    }
+                    self.lastDownloadingTaskId = downloadTask.taskIdentifier
+                    debugPrint("--------> lastDownloadingTaskId -> \(String(describing: self.lastDownloadingTaskId))")
+                    debugPrint("--------> downloadTask.taskIdentifier -> \(String(describing: downloadTask.taskIdentifier))")
                     self.delegate?.downloadRequestDidUpdateProgress(downloadModel, index: index)
                 })
                 break
@@ -438,6 +444,7 @@ extension SabaDownloadManager {
     
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
         print("-------->pause1")
+        self.lastDownloadingTaskId = nil
         let downloadModel = downloadingArray[index]
         
         let downloadTask = downloadModel.task
@@ -488,6 +495,7 @@ extension SabaDownloadManager {
     
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
         print("-------->resume")
+        self.lastDownloadingTaskId = nil
         let downloadModel = self.downloadingArray[index]
         let taskName = String(downloadModel.task?.taskIdentifier ?? -1)
         if let operations = queue.operations as? [SynchronousOperation],
@@ -524,7 +532,6 @@ extension SabaDownloadManager {
                     downloadModel.status = TaskStatus.downloading.description()
                     
                     self?.downloadingArray[index] = downloadModel
-                    self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
                     operation.name = taskName
                     print("-------->add task ddd----> 2 --> \(taskName)")
                     self?.semaphore.wait()
@@ -557,6 +564,7 @@ extension SabaDownloadManager {
     
     @objc public func cancelTaskAtIndex(_ index: Int) {
         print("-------->cancel")
+        self.lastDownloadingTaskId = nil
         let downloadInfo = downloadingArray[index]
         let downloadTask = downloadInfo.task
         downloadTask!.cancel()
