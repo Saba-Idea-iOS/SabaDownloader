@@ -75,7 +75,6 @@ public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
     }
     
     fileprivate func backgroundSession(identifier: String, configuration: URLSessionConfiguration? = nil) -> URLSession {
-        print("-------->backgroundSession")
         let sessionConfiguration = configuration ?? SabaDownloadManager.defaultSessionConfiguration(identifier: identifier)
         assert(identifier == sessionConfiguration.identifier, "Configuration identifiers do not match")
         let session = Foundation.URLSession(configuration: sessionConfiguration, delegate: self, delegateQueue: nil)
@@ -155,7 +154,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                     if self.downloadingArray.contains(downloadModel), let objectIndex = self.downloadingArray.firstIndex(of: downloadModel) {
                         self.downloadingArray[objectIndex] = downloadModel
                     }
-//                    debugPrint("--------> downloadTask.taskIdentifier -> \(String(describing: downloadTask.taskIdentifier))")
                     self.delegate?.downloadRequestDidUpdateProgress(downloadModel, index: index)
                 })
                 break
@@ -164,7 +162,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
     }
     
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        print("didFinishDownloadingTo-------->11")
         for (index, downloadModel) in downloadingArray.enumerated() {
             if downloadTask.isEqual(downloadModel.task) {
                 let fileName = downloadModel.fileName as NSString
@@ -207,8 +204,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
     
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         debugPrint("task id: \(task.taskIdentifier)")
-        print("didCompleteWithError-------->12")
-        print("-------->didCompleteWithError-operationCount: \(queue.operationCount)")
         /***** Any interrupted tasks due to any reason will be populated in failed state after init *****/
         
         DispatchQueue.main.async {
@@ -216,8 +211,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
             let err = error as NSError?
             
             if (err?.userInfo[NSURLErrorBackgroundTaskCancelledReasonKey] as? NSNumber)?.intValue == NSURLErrorCancelledReasonUserForceQuitApplication || (err?.userInfo[NSURLErrorBackgroundTaskCancelledReasonKey] as? NSNumber)?.intValue == NSURLErrorCancelledReasonBackgroundUpdatesDisabled {
-                
-                print("-------->20")
                 let downloadTask = task as! URLSessionDownloadTask
                 let taskDescComponents: [String] = downloadTask.taskDescription!.components(separatedBy: ",")
                 let fileName = taskDescComponents[self.TaskDescFileNameIndex]
@@ -234,10 +227,8 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 
                 var newTask = downloadTask
                 if self.isValidResumeData(resumeData) == true {
-                    print("-------->28")
                     newTask = self.sessionManager.downloadTask(withResumeData: resumeData!)
                 } else {
-                    print("-------->29")
                     newTask = self.sessionManager.downloadTask(with: URL(string: fileURL as String)!)
                 }
                 
@@ -252,11 +243,9 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
                 delay(0.8) { [weak self] in
-                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) && self?.queue.operationCount > 0 {
-                        print("-------->urldidcomplete1-continue")
+                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
+                        self?.queue.operationCount > 0 {
                         self?.semaphore.continue()
-                    } else {
-                        print("-------->executing0 > 0")
                     }
                 }
                 
@@ -271,30 +260,21 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
                                 delay(0.8) { [weak self] in
                                     if self?.queue.operationCount > 0 {
-                                        print("-------->when download finished")
-                                        print("-------->urldidcomplete22-continue")
                                         self?.semaphore.continue()
                                         self?.queue.resume()
-                                    } else {
-                                        print("-------->executing1 > 0")
                                     }
                                 }
                             } else {
-                                print("-------->23")
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
                                 delay(0.8) { [weak self] in
                                     if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
                                         self?.queue.operationCount > 0 {
-                                        print("-------->urldidcomplete23-continue")
                                         self?.semaphore.continue()
-                                    } else {
-                                        print("-------->executing2 > 0")
                                     }
                                 }
                             }
                             
                         } else {
-                            print("-------->24")
                             let resumeData = err?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
                             var newTask = task
                             if self.isValidResumeData(resumeData) == true {
@@ -313,16 +293,13 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             guard downloadModel.status != TaskStatus.paused.description() else {
                                 downloadModel.status = TaskStatus.paused.description()
                                 self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
-                                print("-------->!= TaskStatus.paused.description")
                                 return
                             }
                             
                             if let error = err {
-                                print("-------->25")
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
                             } else {
                                 let error: NSError = NSError(domain: "SabaDownloadManagerDomain", code: 1000, userInfo: [NSLocalizedDescriptionKey : "Unknown error occurred"])
-                                print("-------->26")
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
                             }
                         }
@@ -334,7 +311,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
     }
     
     public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        print("urlSessionDidFinishEvents-------->13")
         if let backgroundCompletion = self.backgroundSessionCompletionHandler {
             DispatchQueue.main.async(execute: {
                 backgroundCompletion()
@@ -399,26 +375,22 @@ extension QueueDownloadManager {
     }
     
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
-        print("-------->pause1")
-        let downloadModel = downloadingArray[index]        
+        let downloadModel = downloadingArray[index]
         let downloadTask = downloadModel.task
         downloadTask!.progress.pause()
         downloadTask!.suspend()
         downloadModel.status = TaskStatus.paused.description()
         downloadingArray[index] = downloadModel
         
-        print("-------->1-operationCount: \(queue.operationCount)")
         for oper in queue.operations {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
-                print("-------->operation- \(operation)")
                 if operation.isExecuting {
                     operation.cancel()
                     operation.finish(false)
                 } else {
                     operation.cancel()
                     operation.finish(false)
-                    print("-------->pause-return")
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
@@ -427,22 +399,18 @@ extension QueueDownloadManager {
         delay(0.5) { [weak self] in
             if self?.queue.operationCount > 0 {
                 self?.semaphore.continue()
-                print("-------->pause-continue")
             }
         }
     }
    
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
-        print("-------->resume")
         let downloadModel = self.downloadingArray[index]
         let taskName = String(downloadModel.task?.taskIdentifier ?? -1)
-        print("-------->3-operationCount: \(queue.operationCount)")
         delay(1.0) { [weak self] in
             downloadModel.status = TaskStatus.waiting.description()
             self?.delegate?.downloadRequestQueued?(downloadModel, index: index)
             let operation = ConcurrentOperation { operation in
                 operation.maximumRetries = 0
-                print("-------->resume operation running")
                 guard downloadModel.status != TaskStatus.downloading.description() else {
                     return
                 }
@@ -457,13 +425,10 @@ extension QueueDownloadManager {
             operation.name = taskName
             self?.queue.addOperation(operation)
             self?.queue.resume()
-            print("-------->4-operationCount: \(String(describing: self?.queue.operationCount))")
         }
-        print("-------->4-operationCount: \(queue.operationCount)")
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
-        print("-------->retry")
         let downloadModel = downloadingArray[index]
         
         guard downloadModel.status != TaskStatus.downloading.description() ||
@@ -478,14 +443,12 @@ extension QueueDownloadManager {
     }
     
     @objc public func cancelTaskAtIndex(_ index: Int) {
-        print("-------->cancel")
         let downloadInfo = downloadingArray[index]
         let downloadTask = downloadInfo.task
         downloadTask!.cancel()
         for oper in queue.operations {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
-                print("operation.name----------->\(operation.name ?? "no")")
                 operation.cancel()
                 if operation.isExecuting {
                     operation.finish(false)
