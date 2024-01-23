@@ -1,15 +1,10 @@
 //
 //  SabaDownloadModel.swift
 //  SabaDownloadManager
-//
-//  Created by Muhammad Zeeshan on 19/04/2016.
-//  Copyright © 2016 ideamakerz. All rights reserved.
-//
-
 import Foundation
 
 public enum TaskStatus: Int {
-    case unknown, gettingInfo, downloading, paused, failed
+    case unknown, gettingInfo, downloading, paused, failed, waiting
     
     public func description() -> String {
         switch self {
@@ -21,6 +16,8 @@ public enum TaskStatus: Int {
             return "Paused"
         case .failed:
             return "Failed"
+        case .waiting:
+            return "Waiting"
         default:
             return "Unknown"
         }
@@ -28,7 +25,6 @@ public enum TaskStatus: Int {
 }
 
 open class SabaDownloadModel: NSObject {
-    
     open var fileName: String!
     open var fileURL: String!
     open var status: String = TaskStatus.gettingInfo.description()
@@ -55,7 +51,7 @@ open class SabaDownloadModel: NSObject {
         self.fileURL = fileURL
     }
     
-    convenience init(fileName: String, fileURL: String, destinationPath: String) {
+    public convenience init(fileName: String, fileURL: String, destinationPath: String) {
         self.init(fileName: fileName, fileURL: fileURL)
         
         self.destinationPath = destinationPath

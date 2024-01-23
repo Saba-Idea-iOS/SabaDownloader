@@ -1,72 +1,37 @@
 //
-//  SabaDownloadManager.swift
-//  SabaDownloadManager
+//  QueueDownloadManager.swift
+//  QueueDownloadManager
 //
 //  Created by Muhammad Zeeshan on 19/04/2016.
 //  Copyright © 2016 ideamakerz. All rights reserved.
 //
 
 import Foundation
+import Queuer
+import SabaDownloader
 
 #if os(iOS)
 import UIKit
 #endif
-
 fileprivate func < <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l < r
-  case (nil, _?):
-    return true
-  default:
-    return false
-  }
+    switch (lhs, rhs) {
+    case let (l?, r?):
+        return l < r
+    case (nil, _?):
+        return true
+    default:
+        return false
+    }
 }
 fileprivate func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l > r
-  default:
-    return rhs < lhs
-  }
+    switch (lhs, rhs) {
+    case let (l?, r?):
+        return l > r
+    default:
+        return rhs < lhs
+    }
 }
-@objc public protocol SabaDownloadManagerDelegate: AnyObject {
-    /**A delegate method called each time whenever any download task's progress is updated
-     */
-    @objc func downloadRequestDidUpdateProgress(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called when interrupted tasks are repopulated
-     */
-    @objc func downloadRequestDidPopulatedInterruptedTasks(_ downloadModel: [SabaDownloadModel])
-    /**A delegate method called each time whenever new download task is start downloading
-     */
-    @objc optional func downloadRequestQueued(_ downloadModel: SabaDownloadModel, index: Int)
-    
-    @objc optional func downloadRequestStarted(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever running download task is paused. If task is already paused the action will be ignored
-     */
-    @objc optional func downloadRequestDidPaused(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever any download task is resumed. If task is already downloading the action will be ignored
-     */
-    @objc optional func downloadRequestDidResumed(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever any download task is resumed. If task is already downloading the action will be ignored
-     */
-    @objc optional func downloadRequestDidRetry(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever any download task is cancelled by the user
-     */
-    @objc optional func downloadRequestCanceled(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever any download task is finished successfully
-     */
-    @objc optional func downloadRequestFinished(_ downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever any download task is failed due to any reason
-     */
-    @objc optional func downloadRequestDidFailedWithError(_ error: NSError, downloadModel: SabaDownloadModel, index: Int)
-    /**A delegate method called each time whenever specified destination does not exists. It will be called on the session queue. It provides the opportunity to handle error appropriately
-     */
-    @objc optional func downloadRequestDestinationDoestNotExists(_ downloadModel: SabaDownloadModel, index: Int, location: URL)
-    
-}
-
-open class SabaDownloadManager: NSObject, SabaDownloadManagerProtocol {
+public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
     fileprivate var sessionManager: URLSession!
     fileprivate var backgroundSessionCompletionHandler: (() -> Void)?
     fileprivate let TaskDescFileNameIndex = 0
@@ -76,14 +41,19 @@ open class SabaDownloadManager: NSObject, SabaDownloadManagerProtocol {
     fileprivate weak var delegate: SabaDownloadManagerDelegate?
     
     open var downloadingArray: [SabaDownloadModel] = []
-    
+    let queue: Queuer = {
+        let queue = Queuer(name: "Saba.Downloader.Queue",
+                           maxConcurrentOperationCount: 1,
+                           qualityOfService: .utility)
+        return queue
+    }()
+    let semaphore = Semaphore()
     /// Initializer for foreground downloader only
     /// - Parameters:
     required public convenience init(delegate: SabaDownloadManagerDelegate, sessionConfiguration: URLSessionConfiguration, completion: (() -> Void)? = nil) {
         self.init()
         self.delegate = delegate
         self.sessionManager = .init(configuration: sessionConfiguration, delegate: self, delegateQueue: nil)
-        self.populateOtherDownloadTasks()
         self.backgroundSessionCompletionHandler = completion
     }
     
@@ -97,7 +67,6 @@ open class SabaDownloadManager: NSObject, SabaDownloadManagerProtocol {
         self.init()
         self.delegate = delegate
         self.sessionManager = backgroundSession(identifier: sessionIdentifer, configuration: sessionConfiguration)
-        self.populateOtherDownloadTasks()
         self.backgroundSessionCompletionHandler = completion
     }
     
@@ -114,9 +83,7 @@ open class SabaDownloadManager: NSObject, SabaDownloadManagerProtocol {
 }
 
 // MARK: Private Helper functions
-
-extension SabaDownloadManager {
-    
+extension QueueDownloadManager {
     fileprivate func downloadTasks() -> [URLSessionDownloadTask] {
         var tasks: [URLSessionDownloadTask] = []
         let semaphore : DispatchSemaphore = DispatchSemaphore(value: 0)
@@ -126,35 +93,9 @@ extension SabaDownloadManager {
         }
         
         let _ = semaphore.wait(timeout: DispatchTime.distantFuture)
-        
         debugPrint("SabaDownloadManager: pending tasks \(tasks)")
         
         return tasks
-    }
-    
-    fileprivate func populateOtherDownloadTasks() {
-        let downloadTasks = self.downloadTasks()
-        
-        for downloadTask in downloadTasks {
-            let taskDescComponents: [String] = downloadTask.taskDescription!.components(separatedBy: ",")
-            let fileName = taskDescComponents[TaskDescFileNameIndex]
-            let fileURL = taskDescComponents[TaskDescFileURLIndex]
-            let destinationPath = taskDescComponents[TaskDescFileDestinationIndex]
-            
-            let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
-            downloadModel.task = downloadTask
-            downloadModel.startTime = Date()
-            
-            if downloadTask.state == .running {
-                downloadModel.status = TaskStatus.downloading.description()
-                downloadingArray.append(downloadModel)
-            } else if(downloadTask.state == .suspended) {
-                downloadModel.status = TaskStatus.paused.description()
-                downloadingArray.append(downloadModel)
-            } else {
-                downloadModel.status = TaskStatus.failed.description()
-            }
-        }
     }
     
     fileprivate func isValidResumeData(_ resumeData: Data?) -> Bool {
@@ -165,9 +106,14 @@ extension SabaDownloadManager {
     }
 }
 
-extension SabaDownloadManager: URLSessionDownloadDelegate {
+extension QueueDownloadManager: URLSessionDownloadDelegate {
     
-    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    public func urlSession(_ session: URLSession,
+                           downloadTask: URLSessionDownloadTask,
+                           didWriteData bytesWritten: Int64,
+                           totalBytesWritten: Int64,
+                           totalBytesExpectedToWrite: Int64) {
+//        print("*********> operationCount > \(queue.operationCount)")
         for (index, downloadModel) in self.downloadingArray.enumerated() {
             if downloadTask.isEqual(downloadModel.task) {
                 DispatchQueue.main.async(execute: { () -> Void in
@@ -203,11 +149,11 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                     downloadModel.downloadedFile = (downloadedFileSize, downloadedSizeUnit as String)
                     downloadModel.speed = (speedSize, speedUnit as String)
                     downloadModel.progress = progress
+                    downloadModel.status = TaskStatus.downloading.description()
                     
                     if self.downloadingArray.contains(downloadModel), let objectIndex = self.downloadingArray.firstIndex(of: downloadModel) {
                         self.downloadingArray[objectIndex] = downloadModel
                     }
-                    
                     self.delegate?.downloadRequestDidUpdateProgress(downloadModel, index: index)
                 })
                 break
@@ -265,7 +211,6 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
             let err = error as NSError?
             
             if (err?.userInfo[NSURLErrorBackgroundTaskCancelledReasonKey] as? NSNumber)?.intValue == NSURLErrorCancelledReasonUserForceQuitApplication || (err?.userInfo[NSURLErrorBackgroundTaskCancelledReasonKey] as? NSNumber)?.intValue == NSURLErrorCancelledReasonBackgroundUpdatesDisabled {
-                
                 let downloadTask = task as! URLSessionDownloadTask
                 let taskDescComponents: [String] = downloadTask.taskDescription!.components(separatedBy: ",")
                 let fileName = taskDescComponents[self.TaskDescFileNameIndex]
@@ -297,6 +242,12 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 }
                 
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
+                delay(0.8) { [weak self] in
+                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
+                        self?.queue.operationCount > 0 {
+                        self?.semaphore.continue()
+                    }
+                }
                 
             } else {
                 for(index, object) in self.downloadingArray.enumerated() {
@@ -307,8 +258,20 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                             
                             if err == nil {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
+                                delay(0.8) { [weak self] in
+                                    if self?.queue.operationCount > 0 {
+                                        self?.semaphore.continue()
+                                        self?.queue.resume()
+                                    }
+                                }
                             } else {
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
+                                delay(0.8) { [weak self] in
+                                    if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
+                                        self?.queue.operationCount > 0 {
+                                        self?.semaphore.continue()
+                                    }
+                                }
                             }
                             
                         } else {
@@ -319,7 +282,6 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                             } else {
                                 newTask = self.sessionManager.downloadTask(with: URL(string: downloadModel.fileURL)!)
                             }
-                            
                             newTask.taskDescription = task.taskDescription
                             if downloadModel.status != TaskStatus.paused.description() {
                                 downloadModel.status = TaskStatus.failed.description()
@@ -329,6 +291,8 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                             self.downloadingArray[index] = downloadModel
                             
                             guard downloadModel.status != TaskStatus.paused.description() else {
+                                downloadModel.status = TaskStatus.paused.description()
+                                self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                                 return
                             }
                             
@@ -336,11 +300,10 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
                             } else {
                                 let error: NSError = NSError(domain: "SabaDownloadManagerDomain", code: 1000, userInfo: [NSLocalizedDescriptionKey : "Unknown error occurred"])
-                                
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
                             }
                         }
-                        break;
+                        break
                     }
                 }
             }
@@ -358,31 +321,35 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
 }
 
 //MARK: Public Helper Functions
-
-extension SabaDownloadManager {
-    
-    @objc public func addDownloadTask(_ fileName: String,
-                                      request: URLRequest,
-                                      destinationPath: String) {
-        
+extension QueueDownloadManager {
+    @objc
+    public func addDownloadTask(_ fileName: String,
+                                request: URLRequest,
+                                destinationPath: String) {
         let url = request.url!
         let fileURL = url.absoluteString
-        
-        let downloadTask = sessionManager.downloadTask(with: request)
-        downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
-        downloadTask.resume()
-        
-        debugPrint("session manager:\(String(describing: sessionManager)) url:\(String(describing: url)) request:\(String(describing: request))")
-        
         let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
-        
         downloadModel.startTime = Date()
-        downloadModel.status = TaskStatus.downloading.description()
+        downloadModel.status = TaskStatus.waiting.description()
+        let downloadTask = self.sessionManager.downloadTask(with: request)
+        downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
         downloadModel.task = downloadTask
-        
-        downloadingArray.append(downloadModel)
-        delegate?.downloadRequestStarted?(downloadModel, index: downloadingArray.count - 1)
+        self.downloadingArray.append(downloadModel)
+        let index = self.downloadingArray.count - 1
+        self.delegate?.downloadRequestQueued?(downloadModel, index: index)
+        let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
+        delay(1.0) { [weak self] in
+            let operation = ConcurrentOperation { operation in
+                downloadTask.resume()
+                self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+                self?.semaphore.wait()
+            }
+            operation.name = taskName
+            self?.queue.addOperation(operation)
+            self?.queue.resume()
+        }
     }
+    
     @objc
     public func addDownloadArray(_ fileName: String,
                                 request: URLRequest,
@@ -407,72 +374,71 @@ extension SabaDownloadManager {
         self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
     }
     
-    @objc public func addDownloadTask(_ fileName: String, fileURL: String, destinationPath: String) {
-        
-        let url = URL(string: fileURL)!
-        let request = URLRequest(url: url)
-        addDownloadTask(fileName, request: request, destinationPath: destinationPath)
-        
-    }
-    
-    @objc public func addDownloadTask(_ fileName: String, fileURL: String) {
-        addDownloadTask(fileName, fileURL: fileURL, destinationPath: "")
-    }
-    
-    @objc public func addDownloadTask(_ fileName: String, request: URLRequest) {
-        addDownloadTask(fileName, request: request, destinationPath: "")
-    }
-    
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
-        
         let downloadModel = downloadingArray[index]
-        
-        guard downloadModel.status != TaskStatus.paused.description() else {
-            return
-        }
-        
         let downloadTask = downloadModel.task
+        downloadTask!.progress.pause()
         downloadTask!.suspend()
         downloadModel.status = TaskStatus.paused.description()
-        downloadModel.startTime = Date()
-        
         downloadingArray[index] = downloadModel
         
-        delegate?.downloadRequestDidPaused?(downloadModel, index: index)
-    }
-    
-    @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
-        
-        let downloadModel = downloadingArray[index]
-        
-        guard downloadModel.status != TaskStatus.downloading.description() else {
-            return
+        for oper in queue.operations {
+            if let operation = oper as? ConcurrentOperation,
+                operation.name == String(downloadTask?.taskIdentifier ?? 0) {
+                if operation.isExecuting {
+                    operation.cancel()
+                    operation.finish(false)
+                } else {
+                    operation.cancel()
+                    operation.finish(false)
+                    delegate?.downloadRequestDidPaused?(downloadModel, index: index)
+                    return
+                }
+            }
         }
-        
-        let downloadTask = downloadModel.task
-        downloadTask!.resume()
-        downloadModel.status = TaskStatus.downloading.description()
-        
-        downloadingArray[index] = downloadModel
-        
-        delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+        delay(0.5) { [weak self] in
+            if self?.queue.operationCount > 0 {
+                self?.semaphore.continue()
+            }
+        }
+    }
+   
+    @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
+        let downloadModel = self.downloadingArray[index]
+        let taskName = String(downloadModel.task?.taskIdentifier ?? -1)
+        delay(1.0) { [weak self] in
+            downloadModel.status = TaskStatus.waiting.description()
+            self?.delegate?.downloadRequestQueued?(downloadModel, index: index)
+            let operation = ConcurrentOperation { operation in
+                operation.maximumRetries = 0
+                guard downloadModel.status != TaskStatus.downloading.description() else {
+                    return
+                }
+                let downloadTask = downloadModel.task
+                downloadTask?.resume()
+                downloadModel.status = TaskStatus.downloading.description()
+                self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+                self?.downloadingArray[index] = downloadModel
+                operation.name = taskName
+                self?.semaphore.wait()
+            }
+            operation.name = taskName
+            self?.queue.addOperation(operation)
+            self?.queue.resume()
+        }
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
         let downloadModel = downloadingArray[index]
         
         guard downloadModel.status != TaskStatus.downloading.description() ||
-              downloadModel.status != TaskStatus.paused.description() else {
+                downloadModel.status != TaskStatus.paused.description() else {
             return
         }
-        
         let downloadTask = downloadModel.task
-        
         downloadTask!.resume()
         downloadModel.status = TaskStatus.downloading.description()
-        downloadModel.startTime = Date()
         downloadModel.task = downloadTask
-        
         downloadingArray[index] = downloadModel
     }
     
@@ -480,10 +446,18 @@ extension SabaDownloadManager {
         let downloadInfo = downloadingArray[index]
         let downloadTask = downloadInfo.task
         downloadTask!.cancel()
+        for oper in queue.operations {
+            if let operation = oper as? ConcurrentOperation,
+                operation.name == String(downloadTask?.taskIdentifier ?? 0) {
+                operation.cancel()
+                if operation.isExecuting {
+                    operation.finish(false)
+                }
+            }
+        }
     }
     
 #if os(iOS)
-    
     @objc public func presentNotificationForDownload(_ notifAction: String, notifBody: String) {
         let application = UIApplication.shared
         let applicationState = application.applicationState
