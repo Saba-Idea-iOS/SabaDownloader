@@ -387,10 +387,10 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 if operation.isExecuting {
                     operation.cancel()
-                    operation.finish(false)
+                    operation.finish(success: true)
                 } else {
                     operation.cancel()
-                    operation.finish(false)
+                    operation.finish(success: true)
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
@@ -451,7 +451,7 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 operation.cancel()
                 if operation.isExecuting {
-                    operation.finish(false)
+                    operation.finish(success: true)
                 }
             }
         }
