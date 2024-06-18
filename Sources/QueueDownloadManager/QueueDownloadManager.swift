@@ -293,11 +293,17 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             guard downloadModel.status != TaskStatus.paused.description() else {
                                 downloadModel.status = TaskStatus.paused.description()
                                 self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
+                                delay(0.8) { [weak self] in
+                                    if self?.queue.operationCount > 1 {
+                                        self?.semaphore.continue()
+                                    }
+                                }
                                 return
                             }
                             
                             if let error = err {
-                                self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
+                                self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel,
+                                                                                  index: index)
                             } else {
                                 let error: NSError = NSError(domain: "SabaDownloadManagerDomain", code: 1000, userInfo: [NSLocalizedDescriptionKey : "Unknown error occurred"])
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
@@ -387,10 +393,10 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 if operation.isExecuting {
                     operation.cancel()
-                    operation.finish(success: true)
+                    operation.finish()
                 } else {
                     operation.cancel()
-                    operation.finish(success: true)
+                    operation.finish()
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
@@ -451,7 +457,7 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 operation.cancel()
                 if operation.isExecuting {
-                    operation.finish(success: true)
+                    operation.finish()
                 }
             }
         }
