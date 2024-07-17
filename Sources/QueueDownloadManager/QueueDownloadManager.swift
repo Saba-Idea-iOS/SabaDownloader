@@ -346,6 +346,7 @@ extension QueueDownloadManager {
         let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
         delay(1.0) { [weak self] in
             let operation = ConcurrentOperation { operation in
+                operation.maximumRetries = 1
                 downloadTask.resume()
                 self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
                 self?.semaphore.wait()
@@ -391,6 +392,7 @@ extension QueueDownloadManager {
         for oper in queue.operations {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
+                operation.maximumRetries = 1
                 if operation.isExecuting {
                     operation.cancel()
                     operation.finish()
@@ -416,7 +418,7 @@ extension QueueDownloadManager {
             downloadModel.status = TaskStatus.waiting.description()
             self?.delegate?.downloadRequestQueued?(downloadModel, index: index)
             let operation = ConcurrentOperation { operation in
-                operation.maximumRetries = 0
+                operation.maximumRetries = 1
                 guard downloadModel.status != TaskStatus.downloading.description() else {
                     return
                 }
