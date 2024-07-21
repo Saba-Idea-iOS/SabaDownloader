@@ -37,7 +37,7 @@ public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
     fileprivate let TaskDescFileNameIndex = 0
     fileprivate let TaskDescFileURLIndex = 1
     fileprivate let TaskDescFileDestinationIndex = 2
-    
+    var lock = NSLock()
     fileprivate weak var delegate: SabaDownloadManagerDelegate?
     
     open var downloadingArray: [SabaDownloadModel] = []
@@ -205,7 +205,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         debugPrint("task id: \(task.taskIdentifier)")
         /***** Any interrupted tasks due to any reason will be populated in failed state after init *****/
-        
         DispatchQueue.main.async {
             
             let err = error as NSError?
@@ -346,7 +345,7 @@ extension QueueDownloadManager {
         let taskName = String(downloadModel.task?.taskIdentifier ?? 0)
         delay(1.0) { [weak self] in
             let operation = ConcurrentOperation { operation in
-                operation.maximumRetries = 1
+                operation.maximumRetries = 0
                 downloadTask.resume()
                 self?.delegate?.downloadRequestDidResumed?(downloadModel, index: index)
                 self?.semaphore.wait()
@@ -380,23 +379,30 @@ extension QueueDownloadManager {
         let index = self.downloadingArray.count - 1
         self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
     }
-    
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
+        defer {
+            self.lock.unlock()
+        }
+        self.lock.lock()
         let downloadModel = downloadingArray[index]
         let downloadTask = downloadModel.task
         downloadTask!.progress.pause()
         downloadTask!.suspend()
         downloadModel.status = TaskStatus.paused.description()
         downloadingArray[index] = downloadModel
-        
         for oper in queue.operations {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 if operation.isExecuting {
                     operation.cancel()
-                    operation.finish()
+                    if !operation.isFinished {
+                        operation.finish()
+                    }
                 } else {
                     operation.cancel()
+                    if !operation.isFinished {
+                        operation.finish()
+                    }
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
@@ -410,13 +416,17 @@ extension QueueDownloadManager {
     }
    
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
+        defer {
+            self.lock.unlock()
+        }
+        self.lock.lock()
         let downloadModel = self.downloadingArray[index]
         let taskName = String(downloadModel.task?.taskIdentifier ?? -1)
         delay(1.0) { [weak self] in
             downloadModel.status = TaskStatus.waiting.description()
             self?.delegate?.downloadRequestQueued?(downloadModel, index: index)
             let operation = ConcurrentOperation { operation in
-                operation.maximumRetries = 1
+                operation.maximumRetries = 0
                 guard downloadModel.status != TaskStatus.downloading.description() else {
                     return
                 }
@@ -435,6 +445,7 @@ extension QueueDownloadManager {
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
+        print("----> retry")
         let downloadModel = downloadingArray[index]
         
         guard downloadModel.status != TaskStatus.downloading.description() ||
@@ -457,7 +468,9 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 operation.cancel()
                 if operation.isExecuting {
-                    operation.finish()
+                    if !operation.isFinished {
+                        operation.finish()
+                    }
                 }
             }
         }
