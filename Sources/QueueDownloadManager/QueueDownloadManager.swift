@@ -445,7 +445,6 @@ extension QueueDownloadManager {
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
-        print("----> retry")
         let downloadModel = downloadingArray[index]
         
         guard downloadModel.status != TaskStatus.downloading.description() ||
