@@ -15,7 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/FabrizioBrancati/Queuer.git", .exact("3.0.0"))
+            url: "https://github.com/FabrizioBrancati/Queuer.git", .exact("3.0.1"))
     ],
     targets: [
         .target(
