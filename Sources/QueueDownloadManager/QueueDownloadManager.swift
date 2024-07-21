@@ -392,13 +392,11 @@ extension QueueDownloadManager {
         for oper in queue.operations {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
-                operation.maximumRetries = 1
                 if operation.isExecuting {
                     operation.cancel()
                     operation.finish()
                 } else {
                     operation.cancel()
-                    operation.finish()
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
