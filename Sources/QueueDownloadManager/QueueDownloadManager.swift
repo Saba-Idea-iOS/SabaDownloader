@@ -395,23 +395,18 @@ extension QueueDownloadManager {
             print("operation.name -----> \(oper.name ?? "")")
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
-                print("operation.name -----> \(operation.name ?? "")")
                 if operation.isExecuting {
                     operation.cancel()
-                    if !operation.isFinished {
-                        operation.finish()
-                    }
+                    operation.finish()
                 } else {
                     operation.cancel()
-                    if !operation.isFinished {
-                        operation.finish()
-                    }
+                    operation.finish()
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
             }
         }
-        delay(0.5) { [weak self] in
+        delay(0.8) { [weak self] in
             if self?.queue.operationCount > 0 {
                 self?.semaphore.continue()
                 print("-----> continue 1")
