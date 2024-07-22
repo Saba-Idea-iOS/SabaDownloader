@@ -240,7 +240,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 }
                 
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
-                delay(0.8) { [weak self] in
+                delay(1.0) { [weak self] in
                     if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
                         self?.queue.operationCount > 0 {
                         self?.semaphore.continue()
@@ -258,7 +258,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             
                             if err == nil {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
-                                delay(0.8) { [weak self] in
+                                delay(1.0) { [weak self] in
                                     if self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
                                         self?.queue.resume()
@@ -267,7 +267,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                 }
                             } else {
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
-                                delay(0.8) { [weak self] in
+                                delay(1.0) { [weak self] in
                                     if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
                                         self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
@@ -295,7 +295,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             guard downloadModel.status != TaskStatus.paused.description() else {
                                 downloadModel.status = TaskStatus.paused.description()
                                 self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
-                                delay(0.8) { [weak self] in
+                                delay(1.0) { [weak self] in
                                     if self?.queue.operationCount > 1,
                                        !(error?.localizedDescription.contains("The request timed out.") ?? true) {
                                         self?.semaphore.continue()
@@ -406,7 +406,7 @@ extension QueueDownloadManager {
                 }
             }
         }
-        delay(0.8) { [weak self] in
+        delay(1.0) { [weak self] in
             if self?.queue.operationCount > 0 {
                 self?.semaphore.continue()
                 print("-----> continue 1")
