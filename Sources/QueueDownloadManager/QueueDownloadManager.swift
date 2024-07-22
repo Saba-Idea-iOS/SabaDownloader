@@ -462,9 +462,7 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 operation.cancel()
                 if operation.isExecuting {
-                    if !operation.isFinished {
-                        operation.finish()
-                    }
+                    operation.finish()
                 }
             }
         }
