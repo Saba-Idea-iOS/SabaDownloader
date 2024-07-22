@@ -461,9 +461,7 @@ extension QueueDownloadManager {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 operation.cancel()
-                if operation.isExecuting {
-                    operation.finish()
-                }
+                operation.finish()
             }
         }
     }
