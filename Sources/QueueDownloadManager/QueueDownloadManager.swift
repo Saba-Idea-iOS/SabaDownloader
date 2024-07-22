@@ -37,7 +37,6 @@ public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
     fileprivate let TaskDescFileNameIndex = 0
     fileprivate let TaskDescFileURLIndex = 1
     fileprivate let TaskDescFileDestinationIndex = 2
-    var lock = NSLock()
     fileprivate weak var delegate: SabaDownloadManagerDelegate?
     
     open var downloadingArray: [SabaDownloadModel] = []
@@ -245,10 +244,12 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                     if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
                         self?.queue.operationCount > 0 {
                         self?.semaphore.continue()
+                        print("-----> continue 2")
                     }
                 }
                 
             } else {
+                print("error -----> \(String(describing: error))")
                 for(index, object) in self.downloadingArray.enumerated() {
                     let downloadModel = object
                     if task.isEqual(downloadModel.task) {
@@ -261,6 +262,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                     if self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
                                         self?.queue.resume()
+                                        print("-----> continue 3")
                                     }
                                 }
                             } else {
@@ -269,6 +271,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                     if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
                                         self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
+                                        print("-----> continue 4")
                                     }
                                 }
                             }
@@ -293,8 +296,10 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                 downloadModel.status = TaskStatus.paused.description()
                                 self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                                 delay(0.8) { [weak self] in
-                                    if self?.queue.operationCount > 1 {
+                                    if self?.queue.operationCount > 1,
+                                       !(error?.localizedDescription.contains("The request timed out.") ?? true) {
                                         self?.semaphore.continue()
+                                        print("-----> continue 5")
                                     }
                                 }
                                 return
@@ -380,10 +385,6 @@ extension QueueDownloadManager {
         self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
     }
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
-        defer {
-            self.lock.unlock()
-        }
-        self.lock.lock()
         let downloadModel = downloadingArray[index]
         let downloadTask = downloadModel.task
         downloadTask!.progress.pause()
@@ -391,8 +392,10 @@ extension QueueDownloadManager {
         downloadModel.status = TaskStatus.paused.description()
         downloadingArray[index] = downloadModel
         for oper in queue.operations {
+            print("operation.name -----> \(oper.name ?? "")")
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
+                print("operation.name -----> \(operation.name ?? "")")
                 if operation.isExecuting {
                     operation.cancel()
                     if !operation.isFinished {
@@ -411,15 +414,12 @@ extension QueueDownloadManager {
         delay(0.5) { [weak self] in
             if self?.queue.operationCount > 0 {
                 self?.semaphore.continue()
+                print("-----> continue 1")
             }
         }
     }
    
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
-        defer {
-            self.lock.unlock()
-        }
-        self.lock.lock()
         let downloadModel = self.downloadingArray[index]
         let taskName = String(downloadModel.task?.taskIdentifier ?? -1)
         delay(1.0) { [weak self] in
