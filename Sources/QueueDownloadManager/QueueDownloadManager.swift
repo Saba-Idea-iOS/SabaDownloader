@@ -440,7 +440,7 @@ extension QueueDownloadManager {
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
-        print("-----> retry")
+        print("-----> retry") // I should check when the error has come the taskname should be equal with the current executing task and opertaion else should return and not to retry
         return
         let downloadModel = downloadingArray[index]
         
