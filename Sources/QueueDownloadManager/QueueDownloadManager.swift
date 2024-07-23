@@ -262,7 +262,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                 delay(1.0) { [weak self] in
                                     if self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
-                                        print("-----> continue 3")
+                                        print("-----> continue 3") // complete the task or operation
                                     }
                                 }
                             } else {
@@ -271,7 +271,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                     if !(self?.queue.operations.contains(where: { $0.isExecuting }) ?? false) &&
                                         self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
-                                        print("-----> continue 4")
+                                        print("-----> continue 4") // cancel the task or operation
                                     }
                                 }
                             }
