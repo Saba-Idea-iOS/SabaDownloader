@@ -216,6 +216,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 let destinationPath = taskDescComponents[self.TaskDescFileDestinationIndex]
                 
                 let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
+                print("downloadModel.status1 ------->\(downloadModel.status)")
                 if downloadModel.status != TaskStatus.paused.description() {
                     downloadModel.status = TaskStatus.failed.description()
                 }
@@ -261,7 +262,6 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                 delay(1.0) { [weak self] in
                                     if self?.queue.operationCount > 0 {
                                         self?.semaphore.continue()
-                                        self?.queue.resume()
                                         print("-----> continue 3")
                                     }
                                 }
@@ -277,6 +277,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             }
                             
                         } else {
+                            print("downloadModel.status2 ------->\(downloadModel.status)")
                             let resumeData = err?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
                             var newTask = task
                             if self.isValidResumeData(resumeData) == true {
@@ -397,10 +398,14 @@ extension QueueDownloadManager {
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 if operation.isExecuting {
                     operation.cancel()
-                    operation.finish()
+                    if !operation.isFinished {
+                        operation.finish()
+                    }
                 } else {
                     operation.cancel()
-                    operation.finish()
+                    if !operation.isFinished {
+                        operation.finish()
+                    }
                     delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                     return
                 }
@@ -440,15 +445,20 @@ extension QueueDownloadManager {
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
-        print("-----> retry") // I should check when the error has come the taskname should be equal with the current executing task and opertaion else should return and not to retry
-        return
+        print("-----> retry1")
         let downloadModel = downloadingArray[index]
-        
+        let downloadTask = downloadModel.task
+        guard let operation =
+                queue.operations.first(where: { $0.name == String(downloadTask?.taskIdentifier ?? 0) }), operation.isExecuting else {
+            downloadModel.status = TaskStatus.paused.description()
+            delegate?.downloadRequestDidPaused?(downloadModel, index: index)
+            return
+        }
+        print("-----> retry2")
         guard downloadModel.status != TaskStatus.downloading.description() ||
                 downloadModel.status != TaskStatus.paused.description() else {
             return
         }
-        let downloadTask = downloadModel.task
         downloadTask!.resume()
         downloadModel.status = TaskStatus.downloading.description()
         downloadModel.task = downloadTask
@@ -463,7 +473,9 @@ extension QueueDownloadManager {
             if let operation = oper as? ConcurrentOperation,
                 operation.name == String(downloadTask?.taskIdentifier ?? 0) {
                 operation.cancel()
-                operation.finish()
+                if !operation.isFinished {
+                    operation.finish()
+                }
             }
         }
     }
