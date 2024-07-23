@@ -296,6 +296,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             guard downloadModel.status != TaskStatus.paused.description() else {
                                 downloadModel.status = TaskStatus.paused.description()
                                 self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
+                                print("downloadModel.status - return ------->\(downloadModel.status)")
                                 delay(1.0) { [weak self] in
                                     if self?.queue.operationCount > 1,
                                        !(error?.localizedDescription.contains("The request timed out.") ?? true) {
@@ -307,6 +308,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             }
                             
                             if let error = err {
+                                print("downloadRequestDidFailedWithError ------->\(downloadModel.status)")
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel,
                                                                                   index: index)
                             } else {
