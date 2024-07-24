@@ -127,7 +127,7 @@ extension SabaDownloadManager {
         
         let _ = semaphore.wait(timeout: DispatchTime.distantFuture)
         
-        debugPrint("SabaDownloadManager: pending tasks \(tasks)")
+        printIfDebug("SabaDownloadManager: pending tasks \(tasks)")
         
         return tasks
     }
@@ -227,12 +227,12 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 //If all set just move downloaded file to the destination
                 if fileManager.fileExists(atPath: basePath) {
                     let fileURL = URL(fileURLWithPath: destinationPath as String)
-                    debugPrint("directory path = \(destinationPath)")
+                    printIfDebug("directory path = \(destinationPath)")
                     
                     do {
                         try fileManager.moveItem(at: location, to: fileURL)
                     } catch let error as NSError {
-                        debugPrint("Error while moving downloaded file to destination path:\(error)")
+                        printIfDebug("Error while moving downloaded file to destination path:\(error)")
                         DispatchQueue.main.async(execute: { () -> Void in
                             self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
                         })
@@ -257,7 +257,7 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
     }
     
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        debugPrint("task id: \(task.taskIdentifier)")
+        printIfDebug("task id: \(task.taskIdentifier)")
         /***** Any interrupted tasks due to any reason will be populated in failed state after init *****/
         
         DispatchQueue.main.async {
@@ -353,7 +353,7 @@ extension SabaDownloadManager: URLSessionDownloadDelegate {
                 backgroundCompletion()
             })
         }
-        debugPrint("All tasks are finished")
+        printIfDebug("All tasks are finished")
     }
 }
 
@@ -372,7 +372,7 @@ extension SabaDownloadManager {
         downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
         downloadTask.resume()
         
-        debugPrint("session manager:\(String(describing: sessionManager)) url:\(String(describing: url)) request:\(String(describing: request))")
+        printIfDebug("session manager:\(String(describing: sessionManager)) url:\(String(describing: url)) request:\(String(describing: request))")
         
         let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
         
