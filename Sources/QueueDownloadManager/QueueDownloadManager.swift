@@ -425,7 +425,7 @@ extension QueueDownloadManager {
             lock.unlock()
         }
         lock.lock()
-        delay(0.5) { [self] in
+//        delay(0.5) { [self] in
             queue = queue.compactMap({ $0 })
             for (idx, _) in queue.enumerated() {
                 if queue.filter({ $0.state == .running }).isEmpty,
@@ -448,7 +448,7 @@ extension QueueDownloadManager {
                     }
                 }
             }
-        }
+//        }
     }
     
 #if os(iOS)
