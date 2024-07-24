@@ -200,7 +200,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
                 print("taskName4 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                 print("downloadModel.status1 ------->\(downloadModel.status)")
-                if downloadModel.status != TaskStatus.paused.description() {
+                if downloadModel.status == TaskStatus.downloading.description() {
                     downloadModel.status = TaskStatus.failed.description()
                 }
                 downloadModel.task = downloadTask
