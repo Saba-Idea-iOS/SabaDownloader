@@ -370,6 +370,10 @@ extension QueueDownloadManager {
         queue.removeAll(where: {
             $0.taskDescription == String(downloadModel.task?.taskDescription ?? "")
         })
+        for task in queue.filter({ $0.taskDescription == "" }) {
+            task.suspend()
+        }
+        queue.removeAll(where: { $0.taskDescription == "" })
         downloadTask?.suspend()
         downloadModel.task = downloadTask
         downloadingArray[index] = downloadModel
