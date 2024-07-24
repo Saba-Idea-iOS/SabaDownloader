@@ -46,7 +46,6 @@ public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
         self.init()
         self.delegate = delegate
         self.sessionManager = .init(configuration: sessionConfiguration, delegate: self, delegateQueue: nil)
-        self.populateOtherDownloadTasks()
         self.backgroundSessionCompletionHandler = completion
     }
     
@@ -60,7 +59,6 @@ public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
         self.init()
         self.delegate = delegate
         self.sessionManager = backgroundSession(identifier: sessionIdentifer, configuration: sessionConfiguration)
-        self.populateOtherDownloadTasks()
         self.backgroundSessionCompletionHandler = completion
     }
     
@@ -78,45 +76,6 @@ public class QueueDownloadManager: NSObject, SabaDownloadManagerProtocol {
 
 // MARK: Private Helper functions
 extension QueueDownloadManager {
-    fileprivate func downloadTasks() -> [URLSessionDownloadTask] {
-        var tasks: [URLSessionDownloadTask] = []
-        let semaphore : DispatchSemaphore = DispatchSemaphore(value: 0)
-        sessionManager.getTasksWithCompletionHandler { (dataTasks, uploadTasks, downloadTasks) -> Void in
-            tasks = downloadTasks
-            semaphore.signal()
-        }
-        
-        let _ = semaphore.wait(timeout: DispatchTime.distantFuture)
-        
-        debugPrint("SabaDownloadManager: pending tasks \(tasks)")
-        
-        return tasks
-    }
-    
-    fileprivate func populateOtherDownloadTasks() {
-        let downloadTasks = self.downloadTasks()
-        
-        for downloadTask in downloadTasks {
-            let taskDescComponents: [String] = downloadTask.taskDescription!.components(separatedBy: ",")
-            let fileName = taskDescComponents[TaskDescFileNameIndex]
-            let fileURL = taskDescComponents[TaskDescFileURLIndex]
-            let destinationPath = taskDescComponents[TaskDescFileDestinationIndex]
-            
-            let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
-            downloadModel.task = downloadTask
-            downloadModel.startTime = Date()
-            
-            if downloadTask.state == .running {
-                downloadModel.status = TaskStatus.downloading.description()
-                downloadingArray.append(downloadModel)
-            } else if(downloadTask.state == .suspended) {
-                downloadModel.status = TaskStatus.paused.description()
-                downloadingArray.append(downloadModel)
-            } else {
-                downloadModel.status = TaskStatus.failed.description()
-            }
-        }
-    }
     fileprivate func isValidResumeData(_ resumeData: Data?) -> Bool {
         guard resumeData != nil || resumeData?.count > 0 else {
             return false
@@ -470,13 +429,13 @@ extension QueueDownloadManager {
         lock.lock()
         delay(0.5) { [self] in
             queue = queue.compactMap({ $0 })
-            for (idx, task) in queue.enumerated() {
+            for (idx, _) in queue.enumerated() {
                 if queue.filter({ $0.state == .running }).isEmpty,
                    let firstTask = queue.first {
                     if let index = downloadingArray.firstIndex(where: {
                         $0.task?.taskDescription == firstTask.taskDescription
                     }) {
-                        var downloadModel = downloadingArray[index]
+                        let downloadModel = downloadingArray[index]
                         if let request = downloadModel.task?.currentRequest {
                             let downloadTask = sessionManager.downloadTask(with: request)
                             downloadTask.resume()
