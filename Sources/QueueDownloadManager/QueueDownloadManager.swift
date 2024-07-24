@@ -465,9 +465,9 @@ extension QueueDownloadManager {
     func checkMoreThanOneRunning() {
         if queue.filter({ $0.state == .running }).count > 1 {
             if let index = downloadingArray.firstIndex(where: {
-                $0.task?.taskDescription == queue[1].taskDescription
+                $0.task?.taskDescription == queue.first?.taskDescription ?? ""
             }) {
-                queue[1].suspend()
+                queue.first?.suspend()
                 let downloadModel = self.downloadingArray[index]
                 downloadModel.status = TaskStatus.waiting.description()
                 if let downloadTask = downloadModel.task {
