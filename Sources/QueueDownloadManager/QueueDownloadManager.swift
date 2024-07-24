@@ -91,7 +91,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                            didWriteData bytesWritten: Int64,
                            totalBytesWritten: Int64,
                            totalBytesExpectedToWrite: Int64) {
-//        print("*********> operationCount > \(queue.operationCount)")
+//        debugPrint("*********> operationCount > \(queue.operationCount)")
         for (index, downloadModel) in self.downloadingArray.enumerated() {
             if downloadTask.isEqual(downloadModel.task) {
                 DispatchQueue.main.async(execute: { () -> Void in
@@ -141,9 +141,9 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
     
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         for (index, downloadModel) in downloadingArray.enumerated() {
-            print("taskName5 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+            debugPrint("taskName5 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
             if downloadTask.isEqual(downloadModel.task) {
-                print("taskName6 ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
+                debugPrint("taskName6 ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
                 let fileName = downloadModel.fileName as NSString
                 let basePath = downloadModel.destinationPath == "" ? SabaDownloadUtility.baseFilePath : downloadModel.destinationPath
                 let destinationPath = (basePath as NSString).appendingPathComponent(fileName as String)
@@ -169,7 +169,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                     //Delegate will be called on the session queue
                     //Otherwise blindly give error Destination folder does not exists
                     
-                    print("taskName7 ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
+                    debugPrint("taskName7 ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
                     if let _ = self.delegate?.downloadRequestDestinationDoestNotExists {
                         self.delegate?.downloadRequestDestinationDoestNotExists?(downloadModel, index: index, location: location)
                     } else {
@@ -198,8 +198,8 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 let destinationPath = taskDescComponents[self.TaskDescFileDestinationIndex]
                 
                 let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
-                print("taskName4 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
-                print("downloadModel.status1 ------->\(downloadModel.status)")
+                debugPrint("taskName4 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                debugPrint("downloadModel.status1 ------->\(downloadModel.status)")
                 if downloadModel.status == TaskStatus.downloading.description() {
                     downloadModel.status = TaskStatus.failed.description()
                 }
@@ -218,7 +218,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 downloadModel.task = newTask
                 
                 self.downloadingArray.append(downloadModel)
-                print("taskName3 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                debugPrint("taskName3 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                 
                 guard downloadModel.status != TaskStatus.paused.description() else {
                     return
@@ -226,17 +226,17 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                 
                 self.delegate?.downloadRequestDidPopulatedInterruptedTasks(self.downloadingArray)
                 
-                print("------> continueeeee")
+                debugPrint("------> continueeeee")
                 self.checkQueue()
                 
             } else {
-//                print("error -----> \(String(describing: error))")
+//                debugPrint("error -----> \(String(describing: error))")
                 for(index, object) in self.downloadingArray.enumerated() {
                     let downloadModel = object
                     if task.isEqual(downloadModel.task) {
                         if err?.code == NSURLErrorCancelled || err == nil {
                             self.downloadingArray.remove(at: index)
-                            print("taskName1 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                            debugPrint("taskName1 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                             if err == nil {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
                                 self.queue.removeAll(where: {
@@ -244,15 +244,15 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                                 })
                                 self.checkQueue()
                             } else {
-                                print("taskName8 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                                debugPrint("taskName8 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                                 self.delegate?.downloadRequestCanceled?(downloadModel, index: index)
                                 self.checkQueue()
                             }
                             
                         } else {
                             
-                            print("taskName2 ---------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
-                            print("downloadModel.status2 ------->\(downloadModel.status)")
+                            debugPrint("taskName2 ---------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                            debugPrint("downloadModel.status2 ------->\(downloadModel.status)")
                             let resumeData = err?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
                             var newTask = task
                             if self.isValidResumeData(resumeData) == true {
@@ -260,7 +260,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             } else {
                                 newTask = self.sessionManager.downloadTask(with: URL(string: downloadModel.fileURL)!)
                             }
-                            print("task Description ---------->\(task.taskDescription?.suffix(10) ?? "")")
+                            debugPrint("task Description ---------->\(task.taskDescription?.suffix(10) ?? "")")
                             newTask.taskDescription = task.taskDescription
                             if downloadModel.status == TaskStatus.downloading.description() {
                                 downloadModel.status = TaskStatus.failed.description()
@@ -270,20 +270,20 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             self.downloadingArray[index] = downloadModel
                             
                             if downloadModel.status != TaskStatus.downloading.description() {
-                                print("taskName116565 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                                debugPrint("taskName116565 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                                 downloadModel.status = TaskStatus.paused.description()
                                 self.downloadingArray[index] = downloadModel
                                 self.delegate?.downloadRequestDidPaused?(downloadModel, index: index)
                                 return
                             }
-                            print("taskName11 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                            debugPrint("taskName11 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                             if let error = err {
-                                print("taskName12 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
-                                print("downloadRequestDidFailedWithError ------->\(downloadModel.status)")
+                                debugPrint("taskName12 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                                debugPrint("downloadRequestDidFailedWithError ------->\(downloadModel.status)")
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel,
                                                                                   index: index)
                             } else {
-                                print("taskName13 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
+                                debugPrint("taskName13 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                                 let error: NSError = NSError(domain: "SabaDownloadManagerDomain", code: 1000, userInfo: [NSLocalizedDescriptionKey : "Unknown error occurred"])
                                 self.delegate?.downloadRequestDidFailedWithError?(error, downloadModel: downloadModel, index: index)
                             }
@@ -323,7 +323,7 @@ extension QueueDownloadManager {
         downloadModel.task = downloadTask
         downloadingArray.append(downloadModel)
         delegate?.downloadRequestQueued?(downloadModel, index: downloadingArray.count - 1)
-        print("taskdes - add ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
+        debugPrint("taskdes - add ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
         self.queue.append(downloadTask)
         checkQueue()
     }
@@ -342,7 +342,7 @@ extension QueueDownloadManager {
         let downloadModel = SabaDownloadModel.init(fileName: fileName,
                                                    fileURL: fileURL,
                                                    destinationPath: destinationPath)
-        print("------> \(downloadTask.taskDescription ?? "")")
+        debugPrint("------> \(downloadTask.taskDescription ?? "")")
         downloadModel.startTime = Date()
         downloadModel.status = status
         downloadModel.task = downloadTask
@@ -356,13 +356,13 @@ extension QueueDownloadManager {
         lock.lock()
         let downloadModel = downloadingArray[index]
         let downloadTask = downloadModel.task
-        print("taskdes - pause ----------->\(downloadTask?.taskDescription?.suffix(10) ?? "-")")
+        debugPrint("taskdes - pause ----------->\(downloadTask?.taskDescription?.suffix(10) ?? "-")")
         downloadModel.status = TaskStatus.paused.description()
         let task = queue.first(where: {
             $0.taskDescription == String(downloadModel.task?.taskDescription ?? "")
         })
         let taskDescription = task?.taskDescription ?? ""
-        print("taskDescription ----------->\(taskDescription)")
+        debugPrint("taskDescription ----------->\(taskDescription)")
         task?.suspend()
         queue.removeAll(where: {
             $0.taskDescription == String(downloadModel.task?.taskDescription ?? "")
@@ -384,12 +384,12 @@ extension QueueDownloadManager {
     @objc public func resumeDownloadTaskAtIndex(_ index: Int) {
         let downloadModel = self.downloadingArray[index]
         guard downloadModel.status != TaskStatus.downloading.description() else {
-            print("resume-")
+            debugPrint("resume-")
             return
         }
         downloadModel.status = TaskStatus.waiting.description()
         if let downloadTask = downloadModel.task {
-            print("taskdes-resume ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
+            debugPrint("taskdes-resume ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
             downloadTask.suspend()
             queue.append(downloadTask)
             downloadModel.task = downloadTask
@@ -401,7 +401,7 @@ extension QueueDownloadManager {
     }
     
     @objc public func retryDownloadTaskAtIndex(_ index: Int) {
-        print("-----> retry1")
+        debugPrint("-----> retry1")
         let downloadModel = downloadingArray[index]
         let downloadTask = downloadModel.task
         guard let task =
@@ -411,7 +411,7 @@ extension QueueDownloadManager {
               task.state == .running else {
             return
         }
-        print("-----> retry2")
+        debugPrint("-----> retry2")
         downloadTask!.resume()
         downloadModel.status = TaskStatus.downloading.description()
         downloadModel.task = downloadTask
