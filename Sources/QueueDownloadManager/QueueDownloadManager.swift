@@ -355,6 +355,7 @@ extension QueueDownloadManager {
     }
     
     @objc public func pauseDownloadTaskAtIndex(_ index: Int) {
+        lock.lock()
         let downloadModel = downloadingArray[index]
         let downloadTask = downloadModel.task
         downloadModel.status = TaskStatus.paused.description()
@@ -368,6 +369,7 @@ extension QueueDownloadManager {
                 queue.remove(at: idx)
             }
         }
+        lock.unlock()
         if !queue.isEmpty {
             checkQueue()
         }
