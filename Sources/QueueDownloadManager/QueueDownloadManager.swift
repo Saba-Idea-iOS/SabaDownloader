@@ -143,7 +143,7 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
         for (index, downloadModel) in downloadingArray.enumerated() {
             debugPrint("taskName5 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
             if downloadTask.isEqual(downloadModel.task) {
-                debugPrint("taskName6 ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
+                printIfDebug("taskName6 ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
                 let fileName = downloadModel.fileName as NSString
                 let basePath = downloadModel.destinationPath == "" ? SabaDownloadUtility.baseFilePath : downloadModel.destinationPath
                 let destinationPath = (basePath as NSString).appendingPathComponent(fileName as String)
@@ -477,6 +477,12 @@ extension QueueDownloadManager {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             self.checkMoreThanOneRunning()
         }
+    }
+    
+    func printIfDebug(_ value: Any?) {
+        #if DEBUG
+        print(value ?? "nil")
+        #endif
     }
     
 #if os(iOS)
