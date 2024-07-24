@@ -360,14 +360,12 @@ extension QueueDownloadManager {
         downloadModel.status = TaskStatus.paused.description()
         for (idx,task) in queue.enumerated() {
             if task.taskDescription == String(downloadModel.task?.taskDescription ?? "") {
-                if task.state == .running {
-                    task.suspend()
-                    downloadTask?.suspend()
-                    downloadModel.task = downloadTask
-                    downloadingArray[index] = downloadModel
-                    delegate?.downloadRequestDidPaused?(downloadModel, index: index)
-                    queue.remove(at: idx)
-                }
+                task.suspend()
+                downloadTask?.suspend()
+                downloadModel.task = downloadTask
+                downloadingArray[index] = downloadModel
+                delegate?.downloadRequestDidPaused?(downloadModel, index: index)
+                queue.remove(at: idx)
             }
         }
         if !queue.isEmpty {
