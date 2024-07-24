@@ -239,12 +239,9 @@ extension QueueDownloadManager: URLSessionDownloadDelegate {
                             print("taskName1 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
                             if err == nil {
                                 self.delegate?.downloadRequestFinished?(downloadModel, index: index)
-                                for (index, task) in self.queue.enumerated() {
-                                    if task.taskDescription == String(downloadModel.task?.taskDescription ?? "-") {
-//                                        task.cancel()
-                                        self.queue.remove(at: index)
-                                    }
-                                }
+                                self.queue.removeAll(where: {
+                                    $0.taskDescription == String(downloadModel.task?.taskDescription ?? "")
+                                })
                                 self.checkQueue()
                             } else {
                                 print("taskName8 ----------->\(downloadModel.task?.taskDescription?.suffix(10) ?? "-")")
@@ -424,12 +421,10 @@ extension QueueDownloadManager {
     @objc public func cancelTaskAtIndex(_ index: Int) {
         let downloadInfo = downloadingArray[index]
         let downloadTask = downloadInfo.task
-        for (idx, task) in queue.enumerated() {
-            if task.taskDescription == String(downloadTask?.taskDescription ?? "-") {
-                downloadTask?.cancel()
-                queue.remove(at: idx)
-            }
-        }
+        downloadTask?.cancel()
+        self.queue.removeAll(where: {
+            $0.taskDescription == String(downloadTask?.taskDescription ?? "")
+        })
         checkQueue()
     }
     
