@@ -315,7 +315,7 @@ extension QueueDownloadManager {
         
         let downloadTask = sessionManager.downloadTask(with: request)
         downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
-        downloadTask.suspend()
+        downloadTask.progress.pause()
         let downloadModel = SabaDownloadModel.init(fileName: fileName, fileURL: fileURL, destinationPath: destinationPath)
         downloadModel.startTime = Date()
         downloadModel.status = TaskStatus.waiting.description()
@@ -323,7 +323,7 @@ extension QueueDownloadManager {
         downloadingArray.append(downloadModel)
         delegate?.downloadRequestQueued?(downloadModel, index: downloadingArray.count - 1)
         printIfDebug("taskdes - add ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
-        self.queue.append(downloadTask)
+        self.queue.append(downloadTask.copy() as! URLSessionDownloadTask)
         checkQueue()
     }
     
@@ -337,7 +337,7 @@ extension QueueDownloadManager {
         
         let downloadTask = self.sessionManager.downloadTask(with: request)
         downloadTask.taskDescription = [fileName, fileURL, destinationPath].joined(separator: ",")
-        downloadTask.suspend()
+        downloadTask.progress.pause()
         let downloadModel = SabaDownloadModel.init(fileName: fileName,
                                                    fileURL: fileURL,
                                                    destinationPath: destinationPath)
@@ -357,21 +357,11 @@ extension QueueDownloadManager {
         let downloadTask = downloadModel.task
         printIfDebug("taskdes - pause ----------->\(downloadTask?.taskDescription?.suffix(10) ?? "-")")
         downloadModel.status = TaskStatus.paused.description()
-        let task = queue.first(where: {
-            $0.taskDescription == String(downloadModel.task?.taskDescription ?? "")
-        })
-        let taskDescription = task?.taskDescription ?? ""
-        printIfDebug("taskDescription ----------->\(taskDescription)")
-        task?.suspend()
         queue.removeAll(where: {
             $0.taskDescription == String(downloadModel.task?.taskDescription ?? "")
         })
-        for task in queue.filter({ $0.taskDescription == "" }) {
-            task.suspend()
-        }
         queue.removeAll(where: { $0.taskDescription == "" })
         downloadTask?.suspend()
-        downloadModel.task = downloadTask
         downloadingArray[index] = downloadModel
         delegate?.downloadRequestDidPaused?(downloadModel, index: index)
         lock.unlock()
@@ -390,10 +380,8 @@ extension QueueDownloadManager {
         if let downloadTask = downloadModel.task {
             printIfDebug("taskdes-resume ----------->\(downloadTask.taskDescription?.suffix(10) ?? "-")")
             downloadTask.suspend()
-            queue.append(downloadTask)
-            downloadModel.task = downloadTask
+            queue.append(downloadTask.copy() as! URLSessionDownloadTask)
         }
-        
         downloadingArray[index] = downloadModel
         delegate?.downloadRequestQueued?(downloadModel, index: index)
         checkQueue()
@@ -433,25 +421,19 @@ extension QueueDownloadManager {
         }
         lock.lock()
         queue = queue.compactMap({ $0 })
-        for (idx, _) in queue.enumerated() {
-            if queue.filter({ $0.state == .running }).isEmpty,
-               let firstTask = queue.first {
-                if let index = downloadingArray.firstIndex(where: {
-                    $0.task?.taskDescription == firstTask.taskDescription
-                }) {
-                    let downloadModel = downloadingArray[index]
-                    if let request = downloadModel.task?.currentRequest {
-                        let downloadTask = sessionManager.downloadTask(with: request)
-                        downloadTask.resume()
-                        downloadTask.taskDescription = downloadModel.task?.taskDescription
-                        downloadTask.progress.resume()
-                        downloadModel.task = downloadTask
-                        queue[idx] = downloadTask
-                    }
-                    downloadModel.status = TaskStatus.downloading.description()
-                    downloadingArray[index] = downloadModel
-                    delegate?.downloadRequestDidResumed?(downloadModel, index: index)
-                }
+        if queue.filter({ $0.state == .running }).isEmpty,
+           var firstTask = queue.first {
+            if let index = downloadingArray.firstIndex(where: {
+                $0.task?.taskDescription == firstTask.taskDescription
+            }) {
+                let downloadModel = downloadingArray[index]
+                let downloadTask = downloadModel.task
+                downloadTask?.resume()
+                downloadTask?.progress.resume()
+                downloadModel.status = TaskStatus.downloading.description()
+                downloadingArray[index] = downloadModel
+                delegate?.downloadRequestDidResumed?(downloadModel, index: index)
+                firstTask = downloadTask!.copy() as! URLSessionDownloadTask
             }
         }
     }
@@ -466,7 +448,7 @@ extension QueueDownloadManager {
                 downloadModel.status = TaskStatus.waiting.description()
                 if let downloadTask = downloadModel.task {
                     downloadTask.suspend()
-                    queue.append(downloadTask)
+                    queue.append(downloadTask.copy() as! URLSessionDownloadTask)
                     downloadModel.task = downloadTask
                 }
                 downloadingArray[index] = downloadModel
